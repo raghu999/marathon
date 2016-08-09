@@ -148,7 +148,8 @@ object MarathonBuild extends Build {
     ),
     cancelable in Global := true,
     fork in Test := true,
-    javaOptions in Test += "-Xmx8G"
+    javaOptions in Test += "-Xmx8G",
+    javaOptions in IntegrationTest += "-Xmx8G"
   )
 
   lazy val asmSettings = Seq(

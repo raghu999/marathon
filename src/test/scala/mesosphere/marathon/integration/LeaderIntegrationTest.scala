@@ -128,7 +128,8 @@ class LeaderIntegrationTest extends IntegrationFunSuite
     checkTombstone()
   }
 
-  test("the tombstone stops old instances from becoming leader") {
+  ignore("the tombstone stops old instances from becoming leader") {
+    // FIXME(jason): https://github.com/mesosphere/marathon/issues/4040
     When("Starting an instance with --leader_election_backend")
     val parameters = List(
       "--master", config.master,

@@ -126,11 +126,12 @@ trait SingleMarathonIntegrationTest
       log.info("Setting up local mesos/marathon infrastructure...")
       startZooKeeperProcess()
       startMesos()
+      waitForCleanSlateInMesos()
+
       cleanMarathonState()
 
       startMarathon(config.marathonBasePort, marathonParameters: _*)
 
-      waitForCleanSlateInMesos()
       log.info("Setting up local mesos/marathon infrastructure: done.")
     } else {
       log.info("Using already running Marathon at {}", config.marathonUrl)

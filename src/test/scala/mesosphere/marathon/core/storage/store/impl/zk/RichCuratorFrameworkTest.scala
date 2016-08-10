@@ -1,45 +1,34 @@
 package mesosphere.marathon.core.storage.store.impl.zk
 
-import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 import akka.util.ByteString
 import mesosphere.UnitTest
-import mesosphere.marathon.IntegrationTest
-import mesosphere.marathon.integration.setup.StartedZookeeper
-import mesosphere.util.PortAllocator
-import org.apache.curator.framework.CuratorFrameworkFactory
-import org.apache.curator.{ RetryPolicy, RetrySleeper }
+import mesosphere.marathon.integration.setup.ZookeeperServerTest
 import org.apache.zookeeper.ZooDefs.Perms
 import org.apache.zookeeper.data.{ ACL, Id }
 import org.apache.zookeeper.server.auth.DigestAuthenticationProvider
 import org.apache.zookeeper.{ KeeperException, ZooDefs }
-import org.scalatest.ConfigMap
+import org.scalatest.concurrent.PatienceConfiguration.Timeout
 
 import scala.collection.JavaConversions._
 import scala.collection.immutable.Seq
-import scala.util.{ Random, Try }
+import scala.concurrent.duration._
+import scala.util.Random
 
-@IntegrationTest
-class RichCuratorFrameworkTest extends UnitTest with StartedZookeeper {
+class RichCuratorFrameworkTest extends UnitTest with ZookeeperServerTest {
   // scalastyle:off magic.number
   val root = Random.alphanumeric.take(10).mkString
   val user = new Id("digest", DigestAuthenticationProvider.generateDigest("super:secret"))
   // scalastyle:on
-  lazy val (client, richClient) = {
-    val client = CuratorFrameworkFactory.newClient(config.zkHostAndPort, new RetryPolicy {
-      override def allowRetry(retryCount: Int, elapsedTimeMs: Long, sleeper: RetrySleeper): Boolean = false
-    })
-    client.start()
-    client.getZookeeperClient.getZooKeeper.addAuthInfo(user.getScheme, user.getId.getBytes(StandardCharsets.UTF_8))
-    Try(client.create().forPath(s"/$root"))
-    val chroot = client.usingNamespace(root)
-    (chroot, new RichCuratorFramework(chroot))
+
+  lazy val richClient = {
+    val client = zkClient()
+    client.create(s"/$root").futureValue(Timeout(5.seconds))
+    client.usingNamespace(root)
   }
 
-  override protected def beforeAll(configMap: ConfigMap): Unit = {
-    super.beforeAll(configMap + ("zkPort" -> PortAllocator.ephemeralPort().toString))
-  }
+  lazy val client = richClient.client
 
   after {
     client.getChildren.forPath("/").map { child =>

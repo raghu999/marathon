@@ -6,6 +6,7 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.{ Config, ConfigFactory }
+import mesosphere.marathon.{ IntegrationTest => AnnotatedIntegrationTest }
 import org.scalatest.{ BeforeAndAfter, BeforeAndAfterAll, BeforeAndAfterEach, Matchers, OptionValues, TryValues, WordSpec, WordSpecLike }
 
 import scala.concurrent.Await
@@ -25,6 +26,11 @@ trait UnitTestLike extends WordSpecLike
 
 abstract class UnitTest extends WordSpec with UnitTestLike
 
+@AnnotatedIntegrationTest
+trait IntegrationTestLike extends UnitTestLike
+
+abstract class IntegrationTest extends UnitTest with IntegrationTestLike
+
 trait AkkaUnitTestLike extends UnitTestLike with BeforeAndAfterAll {
   protected lazy val akkaConfig: Config = ConfigFactory.load
   implicit lazy val system = ActorSystem(suiteName, akkaConfig)
@@ -40,3 +46,7 @@ trait AkkaUnitTestLike extends UnitTestLike with BeforeAndAfterAll {
 }
 
 abstract class AkkaUnitTest extends WordSpec with AkkaUnitTestLike
+
+trait AkkaIntegrationTestLike extends AkkaUnitTestLike with IntegrationTestLike
+
+abstract class AkkaIntegrationTest extends AkkaUnitTest with AkkaIntegrationTestLike

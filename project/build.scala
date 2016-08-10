@@ -76,20 +76,9 @@ object MarathonBuild extends Build {
 
   /**
    * Determine scala test runner output. `-e` for reporting on standard error.
-   *
-   * W - without color
-   * D - show all durations
-   * S - show short stack traces
-   * F - show full stack traces
-   * U - unformatted mode
-   * I - show reminder of failed and canceled tests without stack traces
-   * T - show reminder of failed and canceled tests with short stack traces
-   * G - show reminder of failed and canceled tests with full stack traces
-   * K - exclude TestCanceled events from reminder
-   *
    * http://scalatest.org/user_guide/using_the_runner
    */
-  lazy val formattingTestArg = Tests.Argument("-eDFG")
+  lazy val formattingTestArg = Tests.Argument("-eNCHLOQRMDST")
 
   lazy val benchmarkSettings = inConfig(Benchmark)(Defaults.testTasks) ++
     Seq(

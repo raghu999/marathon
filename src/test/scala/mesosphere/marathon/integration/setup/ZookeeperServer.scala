@@ -50,7 +50,7 @@ class ZookeeperServer(
   }, s"Zookeeper-$port")
   private var started = autoStart
   if (autoStart) {
-    thread.start()
+    start()
   }
 
   val connectUri = s"127.0.0.1:$port"

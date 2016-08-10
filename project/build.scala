@@ -1,19 +1,19 @@
-import com.amazonaws.auth.{ EnvironmentVariableCredentialsProvider, InstanceProfileCredentialsProvider }
+import com.amazonaws.auth.{EnvironmentVariableCredentialsProvider, InstanceProfileCredentialsProvider}
 import com.typesafe.sbt.SbtScalariform
 import com.typesafe.sbt.SbtScalariform.ScalariformKeys
 import ohnosequences.sbt.SbtS3Resolver.autoImport._
-import org.scalastyle.sbt.ScalastylePlugin.{ buildSettings => styleSettings }
+import org.scalastyle.sbt.ScalastylePlugin.{buildSettings => styleSettings}
 import sbt.Keys._
 import sbt._
 import sbtassembly.AssemblyKeys._
 import sbtassembly.MergeStrategy
 import sbtbuildinfo.BuildInfoKeys._
-import sbtbuildinfo.{ BuildInfoKey, BuildInfoPlugin }
+import sbtbuildinfo.{BuildInfoKey, BuildInfoPlugin}
 import sbtrelease.ReleasePlugin.autoImport._
 import sbtrelease.ReleaseStateTransformations._
 import sbtrelease._
-import scala.util.Try
 
+import scala.util.Try
 import scalariform.formatter.preferences._
 
 object MarathonBuild extends Build {
@@ -100,13 +100,41 @@ object MarathonBuild extends Build {
       fork in Benchmark := true
     )
 
+  // run integration tests in parallel, each in their own forked jvm
   lazy val integrationTestSettings = inConfig(IntegrationTest)(Defaults.testTasks) ++
     Seq(
-      testOptions in IntegrationTest := Seq(formattingTestArg, Tests.Argument("-n", "mesosphere.marathon.IntegrationTest"))
+      fork in IntegrationTest := true,
+      testOptions in IntegrationTest := Seq(formattingTestArg, Tests.Argument("-n", "mesosphere.marathon.IntegrationTest")),
+      javaOptions in IntegrationTest += "-Xmx8G",
+      testForkedParallel in IntegrationTest := true,
+      parallelExecution in IntegrationTest := false,
+      testGrouping in IntegrationTest <<= (
+        definedTests in IntegrationTest,
+        baseDirectory in IntegrationTest,
+        javaOptions in IntegrationTest,
+        outputStrategy in IntegrationTest,
+        envVars in IntegrationTest,
+        javaHome in IntegrationTest,
+        connectInput in IntegrationTest
+        ).map { (tests, base, options, strategy, env, javaHomeDir, connectIn) =>
+        val opts = ForkOptions(
+          bootJars = Nil,
+          javaHome = javaHomeDir,
+          connectInput = connectIn,
+          outputStrategy = strategy,
+          runJVMOptions = options,
+          workingDirectory = Some(base),
+          envVars = env
+        )
+        tests.map { test =>
+          Tests.Group(test.name, Seq(test), Tests.SubProcess(opts))
+        }
+      }
     )
 
   lazy val testSettings = Seq(
-    parallelExecution in Test := false,
+    parallelExecution in Test := true,
+    testForkedParallel in Test := true,
     testOptions in Test := Seq(formattingTestArg, Tests.Argument("-l", "mesosphere.marathon.IntegrationTest")),
     fork in Test := true
   )
@@ -147,9 +175,8 @@ object MarathonBuild extends Build {
       "Spray Maven Repository"    at "http://repo.spray.io/"
     ),
     cancelable in Global := true,
-    fork in Test := true,
-    javaOptions in Test += "-Xmx8G",
-    javaOptions in IntegrationTest += "-Xmx8G"
+    javaOptions += "-Xmx8G",
+    concurrentRestrictions in Global := Seq(Tags.limitAll(2))
   )
 
   lazy val asmSettings = Seq(

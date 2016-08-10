@@ -8,20 +8,23 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.client.RequestBuilding.Get
 import akka.stream.ActorMaterializer
+import mesosphere.chaos.http.HttpService
+import mesosphere.marathon.metrics.MetricsReporterService
+import mesosphere.marathon.{AllConf, MarathonApp, MarathonSchedulerService}
 import mesosphere.marathon.util.Retry
-import mesosphere.marathon.{AllConf, MarathonApp}
 import mesosphere.util.PortAllocator
 import org.apache.commons.io.FileUtils
+import org.scalatest.{BeforeAndAfterAll, Suite}
 
-import scala.concurrent.{Await, ExecutionContext}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext}
 import scala.util.Try
 
 /**
   * Runs marathon _in process_ with all of the dependencies wired up.
   */
-class LocalMarathon(autoStart: Boolean = true,
-                    conf: Map[String, String] = Map.empty) extends AutoCloseable {
+case class LocalMarathon(autoStart: Boolean = true,
+                        conf: Map[String, String] = Map.empty) extends AutoCloseable {
   lazy val zk = ZookeeperServer(autoStart = true)
   lazy val mesos = MesosLocal(autoStart = true)
   private val semaphore = new Semaphore(0)
@@ -49,6 +52,7 @@ class LocalMarathon(autoStart: Boolean = true,
   private val secretPath = write(workDir, fileName = "marathon-secret", content = "secret1")
 
   lazy val config = conf ++ Map(
+    "master" -> s"zk://${zk.connectUri}/marathon",
     "mesos_authentication_principal" -> "principal",
     "mesos_role" -> "foo",
     "http_port" -> httpPort.toString,
@@ -58,14 +62,19 @@ class LocalMarathon(autoStart: Boolean = true,
 
   private var closing = false
   private val marathon = new MarathonApp() with AutoCloseable {
-    override val conf: AllConf = new AllConf(config.flatMap { case (k,v) => Seq(s"--$k", v)}(collection.breakOut))
+    override val conf = new AllConf(config.flatMap { case (k,v) => Seq(s"--$k", v)}(collection.breakOut))
+
     override def close(): Unit = super.shutdown()
   }
 
   private val thread = new Thread(new Runnable {
     override def run(): Unit = {
       while (!closing) {
-        marathon.runDefault()
+        marathon.run(
+          classOf[HttpService],
+          classOf[MarathonSchedulerService],
+          classOf[MetricsReporterService]
+        )
         semaphore.acquire()
       }
     }
@@ -88,9 +97,28 @@ class LocalMarathon(autoStart: Boolean = true,
     }
   }
 
+  def stop(): Unit = if (started) {
+    marathon.shutdownAndWait()
+    started = false
+  }
+
   override def close(): Unit = {
+    closing = true
     Try(zk.close())
     Try(mesos.close())
+    Try(stop())
+    thread.interrupt()
+    thread.join()
     Await.result(system.terminate(), 5.seconds)
   }
+}
+
+trait LocalMarathonTest extends BeforeAndAfterAll { this: Suite =>
+  val marathon = LocalMarathon(autoStart = true)
+
+  abstract override def afterAll(): Unit = {
+    Try(marathon.close())
+    super.afterAll()
+  }
+
 }

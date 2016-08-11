@@ -79,7 +79,7 @@ private[health] class HealthCheckActor(
           self ! Tick
         }
       )
-    case _ => () // Don't do anything for Mesos health checks
+    case _ => // Don't do anything for Mesos health checks
   }
 
   def dispatchJobs(): Unit = healthCheck match {
@@ -95,7 +95,7 @@ private[health] class HealthCheckActor(
           }
         }
       }
-    case _ => () // Don't do anything for Mesos health checks
+    case _ => // Don't do anything for Mesos health checks
   }
 
   def checkConsecutiveFailures(task: Task, health: Health): Unit = {

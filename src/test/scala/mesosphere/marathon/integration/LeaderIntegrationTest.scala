@@ -57,8 +57,7 @@ class LeaderIntegrationTest extends IntegrationFunSuite
     WaitTestSupport.waitUntil("the leader changes", 30.seconds) { marathon.leader().value != leader }
   }
 
-  // TODO(jasongilanfarr) Marathon will kill itself in this test so this doesn't actually work and needs to be revisited.
-  ignore("it survives a small burn-in reelection test") {
+  ignore("it survives a small burn-in reelection test - https://github.com/mesosphere/marathon/issues/4215") {
     val random = new scala.util.Random
     for (_ <- 1 to 10) {
       Given("a leader")
@@ -83,6 +82,8 @@ class LeaderIntegrationTest extends IntegrationFunSuite
         val results = marathonFacades.map(marathon => marathon.leader())
         results.forall(_.code == 200) && results.map(_.value).distinct.size == 1
       }
+
+      Thread.sleep(random.nextInt(10) * 100L)
     }
   }
 
@@ -127,8 +128,8 @@ class LeaderIntegrationTest extends IntegrationFunSuite
     checkTombstone()
   }
 
-  // TODO(jasongilanfarr) Marathon will kill itself in this test so this doesn't actually work and needs to be revisited.
   ignore("the tombstone stops old instances from becoming leader") {
+    // FIXME(jason): https://github.com/mesosphere/marathon/issues/4040
     When("Starting an instance with --leader_election_backend")
     val parameters = List(
       "--master", config.master,

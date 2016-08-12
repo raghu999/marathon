@@ -87,13 +87,13 @@ object MarathonBuild extends Build {
       fork in Benchmark := true
     )
 
-  // run integration tests in parallel, each in their own forked jvm
   lazy val integrationTestSettings = inConfig(IntegrationTest)(Defaults.testTasks) ++
     Seq(
       fork in IntegrationTest := true,
       testOptions in IntegrationTest := Seq(formattingTestArg, Tests.Argument("-n", "mesosphere.marathon.IntegrationTest")),
       javaOptions in IntegrationTest += "-Xmx8G",
-      parallelExecution in IntegrationTest := false
+      parallelExecution in IntegrationTest := false,
+      testListeners in IntegrationTest := Seq(new JUnitXmlTestsListener((target.value / "integration").getAbsolutePath()))
     )
 
   lazy val testSettings = Seq(
